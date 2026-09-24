@@ -1,0 +1,61 @@
+{
+  "name": "chatgpt-goal-controller",
+  "version": "0.1.8",
+  "private": true,
+  "description": "Local Windows tray controller for monitoring Codex Goals and ChatGPT usage.",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "smoke:app-server": "tsx scripts/smoke-app-server.ts",
+    "stress:app-server": "tsx scripts/stress-app-server.ts",
+    "package:win": "npm run build && electron-builder --win nsis",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "dependencies": {
+    "better-sqlite3": "13.0.3",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "zod": "4.1.12"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "7.6.13",
+    "@types/node": "24.10.1",
+    "@types/react": "19.2.6",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "5.1.1",
+    "electron": "44.4.0",
+    "electron-builder": "26.15.3",
+    "electron-vite": "5.0.0",
+    "tsx": "4.20.6",
+    "typescript": "7.0.2",
+    "vite": "7.3.6",
+    "vitest": "5.0.1"
+  },
+  "build": {
+    "appId": "com.local.chatgpt-goal-controller",
+    "productName": "ChatGPT Goal Controller",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/better-sqlite3/**/*"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false
+    }
+  }
+}

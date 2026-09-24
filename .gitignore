@@ -1,0 +1,8 @@
+node_modules/
+out/
+release/
+coverage/
+*.db
+*.db-shm
+*.db-wal
+*.log
