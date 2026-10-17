@@ -82,7 +82,7 @@ tbody tr:hover { background: #10201b; }
 .goal-action { min-width: 165px; }
 .compact-action { padding: 7px 10px; font-size: 10px; white-space: nowrap; }
 .compact-action.secondary { color: #94b8aa; background: transparent; }
-.goal-actions { display: flex; align-items: center; gap: 7px; }
+.goal-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
 .managed-state { color: #72dfba; font-size: 10px; font-weight: 650; }
 
 .switch { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; }
@@ -147,6 +147,7 @@ footer { display: flex; justify-content: space-between; padding: 14px 2px 0; col
 .startup-error strong { font-size: 16px; }
 .startup-error p { margin: 9px 0 0; line-height: 1.5; }
 .spinner { width: 28px; height: 28px; border: 3px solid #21382f; border-top-color: #4bd8aa; border-radius: 50%; animation: spin .8s linear infinite; }
+.audit-detail { margin: 6px 0 0; overflow-wrap: anywhere; font-size: 12px; line-height: 1.5; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 @media (max-width: 900px) {

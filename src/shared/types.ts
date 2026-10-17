@@ -14,6 +14,7 @@ export type ControllerStatus =
   | 'allowed'
   | 'paused_quota'
   | 'paused_priority'
+  | 'paused_direct'
   | 'paused_manual'
   | 'excluded'
   | 'completed'
@@ -93,10 +94,17 @@ export interface ThreadExecutionState {
 export interface GoalControlResult {
   goalStatus: ThreadGoalStatus
   execution: ThreadExecutionState
-  turnAction: 'none' | 'alreadyRunning' | 'interrupted' | 'started' | 'writerConflict'
+  turnAction: 'none' | 'alreadyRunning' | 'interrupted' | 'interruptRequested' | 'started' | 'writerConflict'
   turnId?: string | null
   verified?: boolean
   writerConflict?: boolean
+  controlError?: string
+  verification?: {
+    source: 'turn/completed' | 'thread/read' | 'loaded-idle' | 'goal-only' | 'unverified'
+    connectionEpoch: number
+    observedAt: number
+    terminalStatus?: 'completed' | 'interrupted' | 'failed'
+  }
 }
 
 export interface ControllerSettings {
@@ -132,6 +140,7 @@ export interface AuditEntry {
 }
 
 export interface DashboardSnapshot {
+  pendingExecutionRequests?: PendingExecutionRequest[]
   status: 'STARTING' | 'MONITORING' | 'MONITORING_ERROR'
   usage: UsageInfo | null
   goals: GoalRecord[]
@@ -141,6 +150,15 @@ export interface DashboardSnapshot {
   lastError: string | null
   cycleRunning: boolean
   appServerVersion: string | null
+}
+
+export interface PendingExecutionRequest {
+  id: number | string
+  method: string
+  connectionEpoch: number
+  receivedAt: number
+  threadId: string | null
+  turnId: string | null
 }
 
 export interface UpdateSettingsInput {
@@ -155,12 +173,15 @@ export interface UpdateSettingsInput {
 }
 
 export interface GoalControllerApi {
+  openSharedCodex(): Promise<string>
   getSnapshot(): Promise<DashboardSnapshot>
   runCheck(): Promise<DashboardSnapshot>
   updatePriority(goalId: string, priority: number): Promise<DashboardSnapshot>
   setExcluded(goalId: string, excluded: boolean): Promise<DashboardSnapshot>
   updateGoalPolicy(goalId: string, policy: GoalPolicyOverride | null): Promise<DashboardSnapshot>
   takeControlAndResume(goalId: string): Promise<DashboardSnapshot>
+  startGoal(goalId: string): Promise<DashboardSnapshot>
+  pauseGoal(goalId: string): Promise<DashboardSnapshot>
   updateSettings(input: UpdateSettingsInput): Promise<DashboardSnapshot>
   pauseAll(): Promise<DashboardSnapshot>
   resumeAllowed(): Promise<DashboardSnapshot>

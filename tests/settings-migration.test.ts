@@ -68,6 +68,14 @@ describe('settings migration and Goal overrides', () => {
     }
     database.updateGoalPolicy('goal-1', policy)
     expect(database.getGoals()[0].policyOverride).toEqual(policy)
+    database.upsertGoals([], 2)
+    expect(database.getGoals()).toEqual([])
+    database.upsertGoals([{
+      id: 'goal-1', name: 'Goal', objective: 'test', remoteStatus: 'paused', runtimeStatus: 'idle',
+      createdAt: 1, lastActivityAt: 1, tokensUsed: 0, tokenBudget: null,
+      lastTurnId: null, lastTurnStatus: null
+    }], 3)
+    expect(database.getGoals()[0].policyOverride).toEqual(policy)
     database.updateGoalPolicy('goal-1', null)
     expect(database.getGoals()[0].policyOverride).toBeNull()
     database.close()

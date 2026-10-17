@@ -196,7 +196,8 @@ export function SettingsDialog({
           </label>
 
           <fieldset className="execution-policy" disabled={usesGeneral}>
-            <legend>Session Kontrolü</legend>
+            <legend>Otomatik / toplu session kontrolü</legend>
+            <p>Satırdaki Başlat / Durdur bu seçeneklerden bağımsız çalışır.</p>
             <label className="switch-row">
               <span><strong>Goal durunca aktif çalışmayı da kes</strong><small>Aktif turn’e interrupt gönderir</small></span>
               <input
@@ -206,7 +207,7 @@ export function SettingsDialog({
               />
             </label>
             <label className="switch-row">
-              <span><strong>Goal başlayınca session’a Continue gönder</strong><small>Aynı thread’de yeni turn başlatır</small></span>
+              <span><strong>İzin verilen Goal’un session’ını devam ettir</strong><small>Aynı sohbette Codex’in Goal devamını bekler</small></span>
               <input
                 type="checkbox"
                 checked={draft.executionPolicy.continueTurnOnResume}

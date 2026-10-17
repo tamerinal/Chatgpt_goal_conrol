@@ -115,7 +115,7 @@ function statusForRemote(goal: RemoteGoal, previous?: GoalRow): ControllerStatus
   if (goal.remoteStatus === 'paused') {
     if (
       previous?.controller_managed &&
-      (previous.controller_status === 'paused_quota' || previous.controller_status === 'paused_priority')
+      (previous.controller_status === 'paused_quota' || previous.controller_status === 'paused_priority' || previous.controller_status === 'paused_direct')
     ) {
       return previous.controller_status
     }
@@ -237,6 +237,9 @@ export class GoalControllerDatabase {
     if (!goalColumns.has('session_control_status')) {
       this.db.exec("ALTER TABLE goals ADD COLUMN session_control_status TEXT NOT NULL DEFAULT 'unknown'")
     }
+    if (!goalColumns.has('remote_present')) {
+      this.db.exec('ALTER TABLE goals ADD COLUMN remote_present INTEGER NOT NULL DEFAULT 0')
+    }
 
     const now = Math.floor(Date.now() / 1000)
     this.db
@@ -302,6 +305,13 @@ export class GoalControllerDatabase {
         token_budget = excluded.token_budget,
         last_turn_id = excluded.last_turn_id,
         last_turn_status = excluded.last_turn_status,
+        session_control_status = CASE
+          WHEN excluded.runtime_status = 'active' THEN 'running'
+          WHEN excluded.runtime_status = 'idle' THEN
+            CASE WHEN excluded.last_turn_status = 'interrupted' THEN 'interrupted' ELSE 'idle' END
+          WHEN goals.session_control_status = 'running' THEN 'unknown'
+          ELSE goals.session_control_status
+        END,
         updated_at = excluded.updated_at
     `)
     const event = this.db.prepare(`
@@ -310,11 +320,12 @@ export class GoalControllerDatabase {
     `)
 
     const transaction = this.db.transaction(() => {
-      this.db.prepare("UPDATE goals SET controller_status = CASE WHEN excluded = 1 THEN 'excluded' ELSE 'error' END").run()
+      this.db.prepare('UPDATE goals SET remote_present = 0').run()
       for (const goal of remoteGoals) {
         const previous = existingById.get(goal.id)
         const controllerStatus = previous ? statusForRemote(goal, previous) : 'excluded'
         upsert.run({ ...goal, controllerStatus, excluded: previous?.excluded ?? 1, now })
+        this.db.prepare('UPDATE goals SET remote_present = 1 WHERE remote_goal_id = ?').run(goal.id)
         if (previous && previous.remote_status !== goal.remoteStatus) {
           event.run(now, goal.id, 'remote_status', previous.remote_status, goal.remoteStatus)
         }
@@ -327,7 +338,7 @@ export class GoalControllerDatabase {
   }
 
   getGoals(): GoalRecord[] {
-    const rows = this.db.prepare('SELECT * FROM goals ORDER BY priority DESC, name COLLATE NOCASE').all() as GoalRow[]
+    const rows = this.db.prepare("SELECT * FROM goals WHERE remote_present = 1 AND remote_status != 'complete' ORDER BY priority DESC, name COLLATE NOCASE").all() as GoalRow[]
     const latest = this.db.prepare(
       'SELECT goal_id, action, reason FROM current_proposals'
     ).all() as Array<{ goal_id: string; action: 'pause' | 'resume'; reason: ActionReason }>
@@ -495,10 +506,12 @@ export class GoalControllerDatabase {
   setExcluded(goalId: string, excluded: boolean): void {
     const result = this.db.prepare(`
       UPDATE goals
-      SET excluded = ?, controller_status = CASE WHEN ? = 1 THEN 'excluded' ELSE 'allowed' END,
+      SET excluded = ?, controller_status = CASE WHEN ? = 1 THEN 'excluded'
+            WHEN remote_status = 'paused' THEN 'paused_direct' ELSE 'allowed' END,
+          controller_managed = CASE WHEN ? = 0 THEN 1 ELSE controller_managed END,
           updated_at = ?
       WHERE remote_goal_id = ?
-    `).run(excluded ? 1 : 0, excluded ? 1 : 0, Math.floor(Date.now() / 1000), goalId)
+    `).run(excluded ? 1 : 0, excluded ? 1 : 0, excluded ? 1 : 0, Math.floor(Date.now() / 1000), goalId)
     if (!result.changes) throw new Error('Goal not found.')
   }
 
@@ -517,6 +530,21 @@ export class GoalControllerDatabase {
         value_json = excluded.value_json,
         updated_at = excluded.updated_at
     `).run(goalId, JSON.stringify(validated), Math.floor(Date.now() / 1000))
+  }
+
+  recordDirectGoalControl(goalId: string, status: ThreadGoalStatus, timestamp: number): void {
+    // Scope remains the user's choice. An included direct pause is eligible for
+    // the next policy check; it is not a permanent manual hold or a new cooldown.
+    const result = this.db.prepare(`
+      UPDATE goals SET remote_status = ?,
+        controller_status = CASE WHEN excluded = 1 THEN 'excluded'
+          WHEN ? = 'paused' THEN 'paused_direct' ELSE 'allowed' END,
+        controller_managed = CASE WHEN excluded = 0 THEN 1 ELSE controller_managed END,
+        paused_at = CASE WHEN ? = 'paused' THEN ? ELSE paused_at END,
+        resumed_at = CASE WHEN ? = 'active' THEN ? ELSE resumed_at END,
+        updated_at = ? WHERE remote_goal_id = ?
+    `).run(status, status, status, timestamp, status, timestamp, timestamp, goalId)
+    if (!result.changes) throw new Error('Goal not found.')
   }
 
   markGoalResumed(goalId: string, timestamp: number): void {

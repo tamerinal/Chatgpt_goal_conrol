@@ -139,6 +139,6 @@ describe('Goal quota evaluation', () => {
       DEFAULT_SETTINGS,
       1_000
     )
-    expect(result.actions).toHaveLength(0)
+    expect(result.actions).toEqual([expect.objectContaining({ goalId: 'cooldown', action: 'pause', reason: 'quota' })])
   })
 })

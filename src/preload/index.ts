@@ -6,6 +6,7 @@ import type {
 } from '../shared/types'
 
 const api: GoalControllerApi = {
+  openSharedCodex: () => ipcRenderer.invoke('controller:open-shared-codex'),
   getSnapshot: () => ipcRenderer.invoke('controller:get-snapshot'),
   runCheck: () => ipcRenderer.invoke('controller:run-check'),
   updatePriority: (goalId, priority) =>
@@ -16,6 +17,8 @@ const api: GoalControllerApi = {
     ipcRenderer.invoke('controller:update-goal-policy', goalId, policy),
   takeControlAndResume: (goalId) =>
     ipcRenderer.invoke('controller:take-control-and-resume', goalId),
+  startGoal: (goalId) => ipcRenderer.invoke('controller:start-goal', goalId),
+  pauseGoal: (goalId) => ipcRenderer.invoke('controller:pause-goal', goalId),
   updateSettings: (input: UpdateSettingsInput) =>
     ipcRenderer.invoke('controller:update-settings', input),
   pauseAll: () => ipcRenderer.invoke('controller:pause-all'),

@@ -1,5 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Tray, type IpcMainInvokeEvent } from 'electron'
 import { join } from 'node:path'
+import { runSharedCodexLauncher } from './shared-codex-launcher'
 import { CodexAppServerAdapter } from '../adapters/codex-app-server/codex-adapter'
 import { ControllerScheduler } from '../core/scheduler/controller-scheduler'
 import { GoalControllerDatabase, recoverControllerDatabaseIfNeeded } from '../persistence/database'
@@ -10,18 +11,23 @@ let tray: Tray | null = null
 let scheduler: ControllerScheduler | null = null
 let isQuitting = false
 
+async function openSharedCodex(): Promise<string> {
+  const script = app.isPackaged
+    ? join(process.resourcesPath, 'icons', 'start-shared-codex.ps1')
+    : join(app.getAppPath(), 'resources', 'start-shared-codex.ps1')
+  return runSharedCodexLauncher(script)
+}
+
 function runTrayAction(action: Promise<unknown> | undefined): void {
   void action?.catch(() => undefined)
 }
 
 function trayIcon(): Electron.NativeImage {
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-      <circle cx="16" cy="16" r="14" fill="#0f9d75"/>
-      <circle cx="16" cy="16" r="8" fill="#072b25"/>
-      <path d="M12 16.5l2.5 2.5L20.5 13" fill="none" stroke="#e8fff7" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>`
-  return nativeImage.createFromDataURL(`data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`)
+  return nativeImage.createFromPath(join(iconDirectory(), 'tray.png'))
+}
+
+function iconDirectory(): string {
+  return app.isPackaged ? join(process.resourcesPath, 'icons') : join(app.getAppPath(), 'resources')
 }
 
 function createWindow(): BrowserWindow {
@@ -32,6 +38,7 @@ function createWindow(): BrowserWindow {
     minHeight: 560,
     show: false,
     title: 'ChatGPT Goal Controller',
+    icon: join(iconDirectory(), 'icon.png'),
     backgroundColor: '#08110f',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -116,8 +123,14 @@ function broadcast(snapshot: DashboardSnapshot): void {
 
 function registerIpc(): void {
   if (!scheduler) throw new Error('Scheduler is not initialized.')
+  ipcMain.handle('controller:open-shared-codex', trustedHandler(openSharedCodex))
   ipcMain.handle('controller:get-snapshot', trustedHandler(() => scheduler!.snapshot()))
   ipcMain.handle('controller:run-check', trustedHandler(() => scheduler!.runCycle()))
+  ipcMain.handle('controller:start-goal', trustedHandler((goalId: string) => scheduler!.startGoal(goalId)))
+  ipcMain.handle('controller:pause-goal', trustedHandler((goalId: string) => {
+    if (typeof goalId !== 'string' || !goalId.trim()) throw new Error('Goal kimliği gerekli.')
+    return scheduler!.pauseGoal(goalId)
+  }))
   ipcMain.handle(
     'controller:update-priority',
     trustedHandler((goalId: string, priority: number) => scheduler!.updatePriority(goalId, priority))
@@ -154,6 +167,7 @@ if (!hasLock) {
   app.on('second-instance', showWindow)
 
   app.whenReady().then(async () => {
+    app.setAppUserModelId('com.local.chatgpt-goal-controller')
     const databasePath = join(app.getPath('userData'), 'goal-controller.db')
     let recovery
     try {

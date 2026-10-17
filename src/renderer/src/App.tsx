@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type {
   DashboardSnapshot,
+  AuditEntry,
   GoalPolicyOverride,
   GoalRecord,
   UpdateSettingsInput,
@@ -58,6 +59,7 @@ const statusLabels: Record<string, string> = {
   allowed: 'İzinli',
   paused_quota: 'Kota',
   paused_priority: 'Öncelik',
+  paused_direct: 'Elle durduruldu',
   paused_manual: 'Manuel/uzak',
   excluded: 'Hariç',
   completed: 'Tamamlandı',
@@ -67,31 +69,36 @@ const statusLabels: Record<string, string> = {
 
 function sessionState(goal: GoalRecord): { label: string; className: string } {
   if (goal.sessionControlStatus === 'writerConflict') return { label: 'Başka uygulamada', className: 'session-writer-conflict' }
-  if (goal.remoteStatus === 'paused' && goal.controllerStatus.startsWith('paused_')) return { label: 'Duraklatıldı', className: 'session-interrupted' }
-  if (goal.sessionControlStatus === 'running') return { label: 'Çalışıyor', className: 'session-active' }
-  if (goal.sessionControlStatus === 'interrupted') return { label: 'Kesildi', className: 'session-interrupted' }
+  if (goal.runtimeStatus === 'active') return { label: 'Çalışıyor', className: 'session-active' }
+  if (goal.runtimeStatus === 'notLoaded' || goal.runtimeStatus === 'unknown') return { label: 'Doğrulanmadı', className: 'session-not-loaded' }
+  if (goal.runtimeStatus === 'idle' && goal.lastTurnStatus === 'interrupted') return { label: 'Son işlem kesildi', className: 'session-interrupted' }
   if (goal.sessionControlStatus === 'error') return { label: 'Hata', className: 'session-error' }
-  if (goal.lastTurnStatus === 'inProgress' || goal.runtimeStatus === 'active') return { label: 'Çalışıyor', className: 'session-active' }
-  if (goal.lastTurnStatus === 'interrupted') return { label: 'Kesildi', className: 'session-interrupted' }
-  if (goal.runtimeStatus === 'notLoaded') return { label: 'Yüklü değil', className: 'session-not-loaded' }
   if (goal.runtimeStatus === 'systemError') return { label: 'Hata', className: 'session-error' }
   return { label: 'Beklemede', className: 'session-idle' }
 }
 
-function GoalRowView({
+export function GoalRowView({
   goal,
   onPriority,
   onExcluded,
-  onTakeControl,
+  onStart,
+  onPause,
   onSettings,
-  starting
+  starting,
+  pausing = false,
+  stale = false,
+  disabled = false
 }: {
   goal: GoalRecord
   onPriority: (goalId: string, priority: number) => void
   onExcluded: (goalId: string, excluded: boolean) => void
-  onTakeControl: (goalId: string) => void
+  onStart: (goalId: string) => void
+  onPause: (goalId: string) => void
   onSettings: (goal: GoalRecord) => void
   starting: boolean
+  pausing?: boolean
+  stale?: boolean
+  disabled?: boolean
 }) {
   const [priority, setPriority] = useState(goal.priority)
   useEffect(() => setPriority(goal.priority), [goal.priority])
@@ -99,6 +106,8 @@ function GoalRowView({
     ? '—'
     : `${goal.proposedAction === 'pause' ? 'Pause' : 'Resume'} · ${goal.proposedReason}`
   const session = sessionState(goal)
+  const canControl = goal.remoteStatus !== 'complete'
+  const actionBusy = disabled || starting || pausing
 
   return (
     <tr>
@@ -129,8 +138,9 @@ function GoalRowView({
         <label className="switch compact">
           <input
             type="checkbox"
-            checked={goal.excluded}
-            onChange={(event) => onExcluded(goal.id, event.target.checked)}
+            aria-label={`${goal.name}: Otomatik kontrole dahil`}
+            checked={!goal.excluded}
+            onChange={(event) => onExcluded(goal.id, !event.target.checked)}
           />
           <span aria-hidden="true" />
           <em>{goal.excluded ? 'Hariç' : 'Dahil'}</em>
@@ -138,16 +148,13 @@ function GoalRowView({
       </td>
       <td className="goal-action">
         <div className="goal-actions">
-          {goal.remoteStatus === 'paused' ? (
-            <button className="compact-action" disabled={starting} onClick={() => onTakeControl(goal.id)}>
-              {starting ? 'Başlatılıyor…' : 'Kontrole al ve başlat'}
-            </button>
-          ) : goal.remoteStatus === 'active' && goal.controllerManaged ? (
-            <span className="managed-state">Kontrolde</span>
-          ) : (
-            <span className="muted">—</span>
-          )}
-          <button className="compact-action secondary" onClick={() => onSettings(goal)}>
+          <button className="compact-action stop-action" disabled={actionBusy || !canControl || (!stale && goal.remoteStatus === 'paused' && goal.runtimeStatus === 'idle')}
+            aria-label={`${goal.name}: Durdur`} title="Otomatik kontrolden bağımsız olarak bu Goal ve aktif session'ı durdurur. Dahil ise sonraki otomatik kontrol yeniden başlatabilir."
+            onClick={() => onPause(goal.id)}>{pausing ? 'Durduruluyor…' : 'Durdur'}</button>
+          <button className="compact-action" disabled={actionBusy || !canControl || (!stale && goal.remoteStatus === 'active' && goal.runtimeStatus === 'active')}
+            aria-label={`${goal.name}: Başlat`} title="Otomatik kontrolden bağımsız başlatır; yerel kota, cooldown ve kapasite kurallarını uygulamaz. Dahil/Hariç değişmez."
+            onClick={() => onStart(goal.id)}>{starting ? 'Doğrulanıyor…' : 'Başlat'}</button>
+          <button className="compact-action secondary" disabled={actionBusy} onClick={() => onSettings(goal)}>
             Ayarlar{goal.policyOverride ? ' · Özel' : ''}
           </button>
         </div>
@@ -156,10 +163,19 @@ function GoalRowView({
   )
 }
 
+export function AuditEntryView({ entry }: { entry: AuditEntry }) {
+  return <article className={`audit-entry ${entry.status}`}>
+    <time>{new Intl.DateTimeFormat('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(entry.timestamp * 1000))}</time>
+    <div><strong>{entry.goalName ?? entry.action}</strong><span>{entry.goalName ? `${entry.action.toUpperCase()} · ${entry.reason}` : entry.detail}</span>{entry.goalName && entry.detail ? <p className="audit-detail">{entry.detail}</p> : null}</div>
+    <b>{entry.status.toUpperCase()}</b>
+  </article>
+}
+
 export function App() {
   const [snapshot, setSnapshot] = useState<DashboardSnapshot | null>(null)
   const [busy, setBusy] = useState(false)
   const [startingGoalId, setStartingGoalId] = useState<string | null>(null)
+  const [pausingGoalId, setPausingGoalId] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [settingsTarget, setSettingsTarget] = useState<SettingsTarget | null>(null)
 
@@ -199,16 +215,32 @@ export function App() {
     }
   }
 
-  async function takeControlAndResume(goalId: string): Promise<void> {
+  async function startGoal(goalId: string): Promise<void> {
     setStartingGoalId(goalId)
     try {
-      await run(
-        () => window.goalController.takeControlAndResume(goalId),
-        'Goal canlı controller yönetimine alındı ve başlatıldı.'
-      )
+      await run(async () => {
+        const result = await window.goalController.startGoal(goalId)
+        const entry = result.audit.find((item) => item.goalId === goalId && item.action === 'resume')
+        setNotice(entry?.status === 'executed'
+          ? 'İşlem doğrulandı. Goal durumu ve çalışma sütununu kontrol edin.'
+          : 'Başlatma doğrulanmadı. İşlem günlüğündeki ayrıntıyı okuyun.')
+      })
     } finally {
       setStartingGoalId(null)
     }
+  }
+
+  async function pauseGoal(goalId: string): Promise<void> {
+    setPausingGoalId(goalId)
+    try {
+      await run(async () => {
+        const result = await window.goalController.pauseGoal(goalId)
+        const entry = result.audit.find(item => item.goalId === goalId && item.action === 'pause')
+        setNotice(entry?.status === 'executed'
+          ? 'Durdurma doğrulandı. Goal ve çalışma durumunu kontrol edin.'
+          : 'Durdurma tam doğrulanmadı. İşlem günlüğündeki ayrıntıyı okuyun.')
+      })
+    } finally { setPausingGoalId(null) }
   }
 
   if (!snapshot) {
@@ -239,6 +271,17 @@ export function App() {
 
       {snapshot.lastError && <div className="error-banner"><strong>MONITORING_ERROR</strong>{snapshot.lastError}</div>}
       {notice && <div className="notice">{notice}</div>}
+      {(snapshot.pendingExecutionRequests?.length ?? 0) > 0 && (
+        <section className="notice" role="status" aria-label="Bekleyen session talepleri">
+          <strong>Session kullanıcı yanıtı bekliyor. Otomatik onay verilmedi.</strong>
+          {snapshot.pendingExecutionRequests?.map((request) => (
+            <p key={`${request.connectionEpoch}:${typeof request.id}:${request.id}`}>
+              {request.method} — Session: {request.threadId ?? 'belirtilmedi'} — Talep: {request.id}
+            </p>
+          ))}
+          <p>Bu sürümde talepler yalnız gösterilir; yanıt verme ekranı sonraki aşamada tamamlanacak.</p>
+        </section>
+      )}
 
       <section className="summary-grid">
         <UsageCard
@@ -255,18 +298,24 @@ export function App() {
         />
         <article className="status-card">
           <div><span>Goal</span><strong>{snapshot.goals.length}</strong></div>
-          <div><span>Aktif</span><strong>{activeCount}</strong></div>
+          <div><span>Aktif Goal</span><strong>{activeCount}</strong></div>
           <p>Son kontrol: {formatTime(snapshot.lastCheckedAt)}</p>
         </article>
       </section>
 
       <section className="command-row" aria-label="Kontroller">
+        <button disabled={busy} onClick={() => run(async () => {
+          const message = await window.goalController.openSharedCodex()
+          setNotice(message)
+        })} title="Önce Codex’ten tamamen çıkın. Codex bu düğmeyle ortak bağlantıda açılır.">
+          Codex ile ortak bağlantıyı aç
+        </button>
         <button className="primary" disabled={busy || snapshot.cycleRunning} onClick={() => run(() => window.goalController.runCheck())}>
           {snapshot.cycleRunning ? 'Kontrol ediliyor…' : 'Şimdi Kontrol Et'}
         </button>
         <button disabled={busy || snapshot.cycleRunning} onClick={() => {
           if (window.confirm('Kapsama dahil çalışan tüm Goal’lar duraklatılacak. Devam edilsin mi?')) {
-            void run(() => window.goalController.pauseAll(), 'Kapsama dahil çalışan Goal’lar duraklatıldı.')
+            void run(() => window.goalController.pauseAll(), 'Durdurma isteği işlendi; Goal ve çalışma sonucu işlem günlüğünde ayrı doğrulanır.')
           }
         }}>
           Pause All
@@ -281,21 +330,26 @@ export function App() {
           <div><h2>Goal’lar</h2><p>Yerel App Server’da Goal durumuna sahip Codex görevleri</p></div>
           <span>{snapshot.goals.length} kayıt</span>
         </div>
+        {snapshot.status !== 'MONITORING' && snapshot.goals.length > 0 && <p className="notice">Son bilinen Goal listesi gösteriliyor. Başlat / Durdur, hedefin güncel durumunu ayrıca okuyarak çalışır.</p>}
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Goal</th><th>Öncelik</th><th>Remote</th><th>Session</th><th>Controller</th><th>Öneri</th><th>Kapsam</th><th>İşlem</th></tr></thead>
+            <thead><tr><th>Goal</th><th>Öncelik</th><th>Goal durumu</th><th>Çalışma</th><th>Yönetim</th><th>Öneri</th><th>Kapsam</th><th>İşlem</th></tr></thead>
             <tbody>
               {snapshot.goals.length === 0 ? (
-                <tr><td colSpan={8} className="empty">Henüz yerel bir Codex Goal bulunamadı.</td></tr>
+                <tr><td colSpan={8} className="empty">{snapshot.status === 'MONITORING' ? 'Güncel bir Goal bulunamadı.' : 'Goal listesi henüz doğrulanamadı. Şimdi Kontrol Et ile yeniden deneyin.'}</td></tr>
               ) : snapshot.goals.map((goal) => (
                 <GoalRowView
                   key={goal.id}
                   goal={goal}
                   onPriority={(goalId, priority) => void run(() => window.goalController.updatePriority(goalId, priority))}
                   onExcluded={(goalId, excluded) => void run(() => window.goalController.setExcluded(goalId, excluded))}
-                  onTakeControl={(goalId) => void takeControlAndResume(goalId)}
+                  onStart={(goalId) => void startGoal(goalId)}
+                  onPause={(goalId) => void pauseGoal(goalId)}
                   onSettings={(selectedGoal) => setSettingsTarget({ mode: 'goal', goal: selectedGoal, settings: snapshot.settings })}
                   starting={startingGoalId === goal.id}
+                  pausing={pausingGoalId === goal.id}
+                  stale={snapshot.status !== 'MONITORING'}
+                  disabled={busy || snapshot.cycleRunning}
                 />
               ))}
             </tbody>
@@ -321,11 +375,7 @@ export function App() {
           <div className="panel-heading"><div><h2>Audit Log</h2><p>Son controller kararları ve hatalar</p></div></div>
           <div className="audit-list">
             {snapshot.audit.length === 0 ? <div className="empty">Henüz audit kaydı yok.</div> : snapshot.audit.slice(0, 40).map((entry) => (
-              <article key={entry.id} className={`audit-entry ${entry.status}`}>
-                <time>{new Intl.DateTimeFormat('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(entry.timestamp * 1000))}</time>
-                <div><strong>{entry.goalName ?? entry.action}</strong><span>{entry.goalName ? `${entry.action.toUpperCase()} · ${entry.reason}` : entry.detail}</span></div>
-                <b>{entry.status.toUpperCase()}</b>
-              </article>
+              <AuditEntryView key={entry.id} entry={entry} />
             ))}
           </div>
         </section>
@@ -350,7 +400,7 @@ export function App() {
 
       <footer>
         <span>{snapshot.appServerVersion ?? 'Codex sürümü okunamadı'}</span>
-        <span>Yerel SQLite · MCP yok · Canlı remote kontrol açık</span>
+        <span>0.1.10-beta.7 · Ortak yerel Codex bağlantısı · Goal bazında Durdur / Başlat</span>
       </footer>
     </main>
   )

@@ -1,6 +1,6 @@
 {
   "name": "chatgpt-goal-controller",
-  "version": "0.1.8",
+  "version": "0.1.10-beta.7",
   "private": true,
   "description": "Local Windows tray controller for monitoring Codex Goals and ChatGPT usage.",
   "main": "out/main/index.js",
@@ -40,7 +40,7 @@
     "appId": "com.local.chatgpt-goal-controller",
     "productName": "ChatGPT Goal Controller",
     "directories": {
-      "output": "release"
+      "output": "release/0.1.10-beta.7"
     },
     "files": [
       "out/**/*",
@@ -49,8 +49,12 @@
     "asarUnpack": [
       "node_modules/better-sqlite3/**/*"
     ],
+    "extraResources": [
+      { "from": "resources", "to": "icons", "filter": ["*.png", "*.ico", "*.ps1"] }
+    ],
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "resources/icon.ico"
     },
     "nsis": {
       "oneClick": false,

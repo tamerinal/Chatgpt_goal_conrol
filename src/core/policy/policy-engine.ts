@@ -26,17 +26,23 @@ export function evaluateWindowPolicy(
   policy: QuotaWindowPolicy,
   measuredAt: number
 ): WindowPolicyDecision {
+  if (!Number.isFinite(window.usedPercent) || window.usedPercent < 0 || window.usedPercent > 100 ||
+      !Number.isInteger(policy.stopRemainingPercent) || policy.stopRemainingPercent < 0 || policy.stopRemainingPercent > 100) {
+    return { blocked: true, finalWindowActive: false, remainingPercent: 0, minutesUntilReset: null }
+  }
   const remainingPercent = Math.max(0, 100 - window.usedPercent)
-  const secondsUntilReset = window.resetsAt === null ? null : window.resetsAt - measuredAt
+  const secondsUntilReset = window.resetsAt === null || !Number.isFinite(window.resetsAt)
+    ? null : window.resetsAt - measuredAt
   const minutesUntilReset = secondsUntilReset !== null && secondsUntilReset > 0
     ? secondsUntilReset / 60
     : null
   const finalWindowActive =
     policy.useFullQuotaNearReset &&
+    Number.isInteger(policy.finalWindowMinutes) && policy.finalWindowMinutes > 0 &&
     minutesUntilReset !== null &&
     minutesUntilReset <= policy.finalWindowMinutes
   return {
-    blocked: !finalWindowActive && remainingPercent <= policy.stopRemainingPercent,
+    blocked: remainingPercent <= 0 || (!finalWindowActive && remainingPercent <= policy.stopRemainingPercent),
     finalWindowActive,
     remainingPercent,
     minutesUntilReset
@@ -90,15 +96,21 @@ export function evaluatePolicies(
     const policy = effectiveGoalPolicy(goal, settings)
     return [goal.id, {
       policy,
-      fiveHour: evaluateWindowPolicy(usage.fiveHour, policy.fiveHourPolicy, usage.measuredAt),
-      weekly: evaluateWindowPolicy(usage.weekly, policy.weeklyPolicy, usage.measuredAt)
+      fiveHour: evaluateWindowPolicy(usage.fiveHour, policy.fiveHourPolicy, now),
+      weekly: evaluateWindowPolicy(usage.weekly, policy.weeklyPolicy, now)
     }] as const
   }))
 
   const candidates = goals
     .filter((goal) => {
       const decision = decisions.get(goal.id)!
+      const selectable = goal.remoteStatus === 'active' || (
+        goal.remoteStatus === 'paused' && goal.controllerManaged &&
+        (goal.controllerStatus === 'paused_quota' || goal.controllerStatus === 'paused_priority' || goal.controllerStatus === 'paused_direct') &&
+        (!goal.cooldownUntil || goal.cooldownUntil <= now)
+      )
       return !goal.excluded &&
+        selectable &&
         goal.remoteStatus !== 'complete' &&
         goal.remoteStatus !== 'blocked' &&
         goal.remoteStatus !== 'usageLimited' &&
@@ -120,7 +132,6 @@ export function evaluatePolicies(
 
   for (const goal of goals) {
     if (goal.excluded || goal.remoteStatus === 'complete') continue
-    if (goal.cooldownUntil && goal.cooldownUntil > now) continue
     const decision = decisions.get(goal.id)!
     const details = [
       windowDetail('5-hour', decision.fiveHour, decision.policy.fiveHourPolicy),
@@ -145,8 +156,8 @@ export function evaluatePolicies(
     const resumable =
       goal.remoteStatus === 'paused' &&
       goal.controllerManaged &&
-      (goal.controllerStatus === 'paused_quota' || goal.controllerStatus === 'paused_priority')
-    if (resumable && allowed.has(goal.id)) {
+      (goal.controllerStatus === 'paused_quota' || goal.controllerStatus === 'paused_priority' || goal.controllerStatus === 'paused_direct')
+    if (resumable && (!goal.cooldownUntil || goal.cooldownUntil <= now) && allowed.has(goal.id)) {
       actions.push({
         goalId: goal.id,
         goalName: goal.name,

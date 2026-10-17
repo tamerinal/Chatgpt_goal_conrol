@@ -1,6 +1,7 @@
 import type {
   ExecutionPolicy,
   GoalControlResult,
+  PendingExecutionRequest,
   RemoteGoal,
   ThreadExecutionState,
   ThreadGoalStatus,
@@ -8,6 +9,8 @@ import type {
 } from '../shared/types'
 
 export interface ChatGPTAdapter {
+  getPendingExecutionRequests?(): PendingExecutionRequest[]
+  onExecutionStateChange?(listener: () => void): () => void
   connect(): Promise<void>
   refreshConnection(): Promise<void>
   close(): Promise<void>
@@ -16,8 +19,8 @@ export interface ChatGPTAdapter {
   getGoalStatus(goalId: string): Promise<ThreadGoalStatus>
   getExecutionState(goalId: string): Promise<ThreadExecutionState>
   pauseGoal(goalId: string, policy: ExecutionPolicy): Promise<GoalControlResult>
-  resumeGoal(goalId: string, policy: ExecutionPolicy): Promise<GoalControlResult>
-  ensureGoalExecution(goalId: string, policy: ExecutionPolicy): Promise<GoalControlResult>
+  resumeGoal(goalId: string, policy: ExecutionPolicy, beforeWrite?: () => Promise<void>): Promise<GoalControlResult>
+  ensureGoalExecution(goalId: string, policy: ExecutionPolicy, beforeWrite?: () => Promise<void>): Promise<GoalControlResult>
   steerGoalTurn(goalId: string, turnId: string, input: string): Promise<boolean>
   getVersion(): Promise<string | null>
 }
