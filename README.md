@@ -1,51 +1,63 @@
 # ChatGPT Goal Controller
 
-## 0.1.10-beta.6 bağımsız satır kontrolleri
+Windows için deneysel tray uygulaması. Aynı bilgisayardaki Codex Goal'larını ve hesap kullanım pencerelerini izler; seçilen Goal'ları kota kurallarına göre duraklatıp devam ettirebilir. Bulut ChatGPT görevlerini yöneten resmî bir OpenAI ürünü değildir.
 
-Her Goal satırındaki **Başlat**, otomatik kontrol kapalı veya Goal Hariç olsa da yerel kota, cooldown ve kapasite kurallarını uygulamadan başlatmayı ister. **Durdur**, ilgili Goal'u duraklatır ve aktif session'ı keser; otomatik execution seçeneği bunu engellemez. İki düğme Dahil/Hariç seçimini değiştirmez. Goal Dahil ve otomatik kontrol açıksa sonraki kontrol kendi kurallarına göre yeniden başlatabilir veya durdurabilir; açık Dahil seçimi de duraklatılmış Goal'u otomatik devam adayı yapar. Sunucunun kendi limitleri ve writer erişimi geçerlidir, sonuç doğrulanmadan başarı yazılmaz. Belirsiz start kör tekrarlanmaz.
+## Windows kurulumu
 
-Kota okuma hatasında son bilinen Goal satırları açıkça etiketlenerek korunur; manuel işlem kendi güncel hedef okumasını yapar. Beta.6 teknik olarak test edildi; kurulu beta.5 ve bekleyen gerçek ekran/fixture testi STATUS.md'de kayıtlıdır.
+1. [Son sürümü indirin](https://github.com/tamerinal/Chatgpt_goal_conrol/releases). `ChatGPT.Goal.Controller.Setup.0.1.10-beta.8.exe` dosyasını kullanın. Kaynak kod ZIP'i kurulum paketi değildir.
+2. İsterseniz indirilen dosyanın SHA256 değerini release içindeki `SHA256SUMS.txt` ile karşılaştırın:
 
+   ```powershell
+   Get-FileHash .\ChatGPT.Goal.Controller.Setup.0.1.10-beta.8.exe -Algorithm SHA256
+   ```
 
-Windows tray uygulaması olarak çalışan, aynı bilgisayardaki yerel Codex Goal'larını ve hesap kullanım pencerelerini izleyen deneysel kontrol uygulaması.
+3. Açık Controller varsa tray menüsünden **Exit** ile çıkın. Kurulum dosyasını çalıştırıp kullanıcı hesabınız için kurun. Mevcut ayarları korumak için aynı kullanıcı hesabını kullanın; uygulama verisini silmeyin.
+4. Codex Desktop ve hesabınızda Goal desteği gerekir. Codex'e kendi hesabınızla giriş yapın. Controller parola, cookie veya erişim anahtarı istemez.
 
-## 0.1.10-beta.2 bağlantısı
+Paket kod imzalı değildir; Windows yayıncıyı doğrulayamayabilir. Kurulum dosyası ve checksum yalnız bu deponun Releases sayfasından edinilmelidir. Bu beta Windows x64 için hazırlanır.
 
-Windows Desktop varsayılan olarak kendi stdio sunucusunu açar; beta.1'in daemon proxy varsayımı bu bilgisayarda çalışmadı. Beta.2, Desktop ile Controller'ı aynı `127.0.0.1:4509` sunucusuna bağlar. Ayrı sunucuya otomatik fallback yoktur. Desktop açıkken helper çalışmayı reddeder; açık uygulamayı kapatmaz veya writer'ı devralmaz.
+## İlk bağlantı
 
-İlk kullanım: otomatik kontrolü ayarlardan kapatın, Codex Desktop'tan tamamen çıkın; Controller'da **Codex ile ortak bağlantıyı aç** düğmesine basın. Sonra **Şimdi Kontrol Et** ile listeyi doğrulayın. Yalnız test hedefini dahil edip kullanıcıyla pause/resume doğrulaması yapın; ardından istenen otomatik kontrol ayarını geri getirin. Sonraki açılışlarda bu düğmeyle Codex'i açın; normal Codex kısayolu varsayılan stdio modunu kullanır.
+1. Controller ayarlarında **Otomatik değerlendirme** seçeneğini kapatın. Yeni kurulumda varsayılanı açıktır; yeni keşfedilen Goal'lar başlangıçta Hariç tutulur.
+2. Codex Desktop'tan tamamen çıkın. Controller'da **Codex ile ortak bağlantıyı aç** düğmesine basın. Helper açık Desktop'ı kapatmaz veya writer kontrolünü zorla devralmaz.
+3. **Şimdi Kontrol Et** ile Goal listesini ve kotayı doğrulayın.
+4. Önce ayrı, önemsiz bir test Goal'unda Başlat/Durdur davranışını kontrol edin. Ardından yöneteceğiniz Goal'ları Dahil yapıp istediğiniz rezervleri, kapasiteyi ve otomatik değerlendirmeyi ayarlayın.
 
-Helper mevcut kullanıcı kurulumunu bulur, gizli ortak sunucuyu başlatır veya kendi PID/başlangıç zamanı/executable/port kaydıyla doğruladığı sunucuyu kullanır. Günlükler `%LOCALAPPDATA%/ChatGPT Goal Controller/shared-codex/` altındadır. Desktop ortam değişkeni yalnız açılan sürece verilir; kalıcı sistem/hesap/config değişikliği yapılmaz. Controller'ın kapanması sadece kendi bağlantılarını kapatır; ortak sunucuyu veya devam eden işi öldürmez.
+Desktop ve Controller aynı `127.0.0.1:4509` sunucusunu kullanır. Sonraki açılışlarda da Controller'ın ortak bağlantı düğmesini kullanın; normal Codex kısayolu ayrı bağlantı açabilir. Helper ortam değişkenlerini yalnız açtığı sürece verir. Başka bir sunucuya otomatik fallback veya writer devralma yapılmaz.
 
-WebSocket taşıması resmî belgede deneysel/desteklenmeyen olarak tanımlanır; Desktop ortam değişkeni mevcut kurulu sürümün statik kaynağında görülmüştür, stabil Desktop API garantisi değildir: [App Server](https://learn.chatgpt.com/docs/app-server). İzole gerçek CLI testinde iki istemcinin aynı thread'i ve Goal değişikliğini gördüğü doğrulandı. Gerçek Desktop ekranında pause/resume kabulü bekleniyor.
+## Başlat, Durdur ve kapsam
 
-Controller ayrı ChatGPT oturumu açmaz; kimlik doğrulamasını mevcut Codex sunucusu yönetir. Parola/cookie/token Controller veritabanına yazılmaz. Bu sürüm farklı bilgisayarlara uzaktan bağlanmaz.
+- **Başlat:** Otomatik kontrol kapalı veya Goal Hariç olsa da başlatmayı ister. Yerel kota, cooldown ve kapasite engellerini uygulamaz. Sunucu limitleri ve writer erişimi geçerlidir.
+- **Durdur:** Goal'u duraklatır ve aktif session'ı kesmeyi ister. Goal ve turn sonuçları ayrı doğrulanır; belirsiz sonuç başarı sayılmaz ve kör tekrar edilmez.
+- **Yeşil/açık = Dahil**, **gri/kapalı = Hariç**. Anahtar yalnız otomatik yönetim kapsamını gösterir. Manuel düğmeler kapsamı değiştirmez.
+- Dahil bir Goal, otomatik değerlendirme açıkken sonraki döngüde kurallara göre yeniden başlayabilir. Durdur düğmesi kalıcı Hariç seçimi değildir.
+- Otomatik yollar güncel iki kota penceresi, Goal override, cooldown ve kapasite kurallarını uygular. Controller ek Continue mesajı üretmek yerine Codex'in native Goal devamını bekler. Approval taleplerini otomatik yanıtlamaz.
 
-Goal durumu ve sohbet çalışması ayrı doğrulanır. Goal aktif olunca Codex'in kendi Goal devam mekanizması beklenir; Controller ek `Continue`/`turn/start` mesajı üretmez. Yazma kontrolü başka süreçteyse sonuç doğrulanmış başarı sayılmaz. Bekleyen kullanıcı soruları otomatik yanıtlanmaz.
+## Veriler ve sorun giderme
 
-Bu sürüm canlı `thread/goal/set`, `thread/resume` ve gerektiğinde `turn/interrupt` gönderebilir; dry-run değildir. Kota ve kapsam ayarları korunur. Teknik testlerin geçmesi gerçek pause/resume kabulü değildir. Güvenilirlik planındaki kalıcı kurtarma ve tüm canlı kabul kapıları henüz tamamlanmamıştır.
+Yerel ayarlar, Goal özeti, kullanım ve işlem geçmişi `%APPDATA%\chatgpt-goal-controller\goal-controller.db` içinde saklanır. Bu dosya kişisel içerik barındırabilir; GitHub'a yüklemeyin. Ortak bağlantı günlükleri `%LOCALAPPDATA%\ChatGPT Goal Controller\shared-codex\` altındadır. Yedek almadan uygulama verisini silmeyin. Controller'dan çıkmak ortak Codex sunucusunu veya devam eden işi öldürmez.
 
-## Durumlar
+Bağlantı hatasında önce Desktop'ın tamamen kapalı olduğunu doğrulayıp ortak bağlantı düğmesini kullanın. Writer conflict durumunda başka uygulamanın kontrolünü zorlamayın. Hata bildirirken token, auth dosyası, DB, konuşma kimliği, kişisel dosya yolu ve ham session çıktısını paylaşmayın.
 
-- **Goal durumu:** Codex'in hedef için bildirdiği yaşam döngüsü.
-- **Çalışma:** Aynı sunucudan gözlenen session/turn; yüklü olmayan oturum durmuş varsayılmaz.
-- **Yönetim / kapsam:** Yerel politika kaydı; writer erişim yetkisi değildir.
-- **İşlem günlüğü:** Başarı, atlama ve hata ayrıntıları satırın altında gösterilir.
+Beta.7'de kapsam anahtarının renk eşlemesi düzeltildi. Beta.8 herkese açık yayın hazırlığı, kişisel kayıt temizliği ve bağımlılık güvenlik güncellemelerini içerir. Önceki kullanıcı işlev testleri olumlu bildirilmiştir; bu sürüm için yeni canlı UI/Goal testi yapılmamıştır. Kalıcı kurtarma, stres/restart ve tüm güvenilirlik kabul kapıları tamamlanmış sayılmaz. Desktop ortak bağlantısı sürüme bağlı deneysel bir entegrasyondur.
 
-Tray, pencere ve Windows executable ikonları PNG/çok boyutlu ICO olarak paketlenir.
+## Kaynaktan geliştirme
 
-## Geliştirme
+Node.js 22.12+ ve npm, Windows paketlemesi için Windows x64 gerekir. Native SQLite modülü gerektiğinde derleme araçlarına ihtiyaç duyabilir. Kurulum lifecycle script'leri Electron'u indirip native bağımlılıkları hazırlayabilir; canlı Goal başlatmaz.
 
 ```powershell
-npm install
+npm ci
+npm run typecheck
 npm test
-npm run dev
+npm run build
 ```
 
-Windows kurulum paketi:
+Geliştirme uygulamasını açmak için `npm run dev` kullanılır; bu komut gerçek hesaba bağlanabilir. Teknik testler sahte adaptörler ve izole DB kullanır. `smoke:app-server`, `stress:app-server` ve canlı fixture script'leri teknik test suite'inin parçası değildir; açık hedef/operatör yetkisi olmadan çalıştırılmamalıdır.
+
+Windows kurulum paketi üretmek için:
 
 ```powershell
 npm run package:win -- --publish never
 ```
 
-Paket `release/0.1.10-beta.2/` altında üretilir. Kurulum ve canlı uygulama/Goal testleri kullanıcıyla yapılır. `smoke:app-server` ve `stress:app-server` gerçek sunucuya bağlanan geliştirme araçlarıdır; teknik test komutu değildir. `check-isolated-shared-server.ts --isolated-transport-check` ise boş geçici CODEX_HOME kullanır; hesap kopyalamaz, model turn'ü başlatmaz, yalnız sentetik thread/Goal ile gerçek taşıma davranışını sınar.
+Çıktı `release/0.1.10-beta.8/` altına yazılır. Paketleme uygulamayı kurmaz veya otomatik yayınlamaz. Release notları ve teknik doğrulama durumu [proje kaydında](docs/control-project/STATUS.md) tutulur.
