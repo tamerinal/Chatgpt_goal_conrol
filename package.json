@@ -1,6 +1,6 @@
 {
   "name": "chatgpt-goal-controller",
-  "version": "0.1.10-beta.7",
+  "version": "0.1.10-beta.8",
   "private": true,
   "description": "Local Windows tray controller for monitoring Codex Goals and ChatGPT usage.",
   "main": "out/main/index.js",
@@ -20,7 +20,7 @@
     "better-sqlite3": "13.0.3",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "zod": "4.1.12"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@types/better-sqlite3": "7.6.13",
@@ -28,29 +28,46 @@
     "@types/react": "19.2.6",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "5.1.1",
-    "electron": "44.4.0",
-    "electron-builder": "26.15.3",
+    "electron": "44.10.2",
+    "electron-builder": "26.18.0",
     "electron-vite": "5.0.0",
     "tsx": "4.20.6",
     "typescript": "7.0.2",
-    "vite": "7.3.6",
-    "vitest": "5.0.1"
+    "vite": "7.3.7",
+    "vitest": "5.1.0"
   },
   "build": {
     "appId": "com.local.chatgpt-goal-controller",
     "productName": "ChatGPT Goal Controller",
     "directories": {
-      "output": "release/0.1.10-beta.7"
+      "output": "release/0.1.10-beta.8"
     },
     "files": [
       "out/**/*",
-      "package.json"
+      "package.json",
+      "!node_modules/better-sqlite3/build/**/*.vcxproj",
+      "!node_modules/better-sqlite3/build/**/*.filters",
+      "!node_modules/better-sqlite3/build/**/*.sln",
+      "!node_modules/better-sqlite3/build/**/*.gypi",
+      "!node_modules/better-sqlite3/build/**/*.pdb",
+      "!node_modules/better-sqlite3/build/**/*.lib",
+      "!node_modules/better-sqlite3/build/**/*.exp",
+      "!node_modules/better-sqlite3/build/**/obj/**/*",
+      "!node_modules/better-sqlite3/build/Release/test_extension.node"
     ],
     "asarUnpack": [
-      "node_modules/better-sqlite3/**/*"
+      "node_modules/better-sqlite3/build/Release/better_sqlite3.node"
     ],
     "extraResources": [
-      { "from": "resources", "to": "icons", "filter": ["*.png", "*.ico", "*.ps1"] }
+      {
+        "from": "resources",
+        "to": "icons",
+        "filter": [
+          "*.png",
+          "*.ico",
+          "*.ps1"
+        ]
+      }
     ],
     "win": {
       "target": "nsis",
@@ -61,5 +78,9 @@
       "allowToChangeInstallationDirectory": true,
       "perMachine": false
     }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tamerinal/Chatgpt_goal_conrol.git"
   }
 }

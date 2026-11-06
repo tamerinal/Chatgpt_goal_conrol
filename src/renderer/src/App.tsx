@@ -400,7 +400,7 @@ export function App() {
 
       <footer>
         <span>{snapshot.appServerVersion ?? 'Codex sürümü okunamadı'}</span>
-        <span>0.1.10-beta.7 · Ortak yerel Codex bağlantısı · Goal bazında Durdur / Başlat</span>
+        <span>0.1.10-beta.8 · Ortak yerel Codex bağlantısı · Goal bazında Durdur / Başlat</span>
       </footer>
     </main>
   )
