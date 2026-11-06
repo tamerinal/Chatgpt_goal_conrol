@@ -16,4 +16,11 @@ Etkin kapsam: kullanıcının public depo kontrolü, kişisel kayıt temizliği,
 - Paket Electron 44.10.2 ile yalnız ELECTRON_RUN_AS_NODE modunda, gerçek uygulamayı/bağlantıyı açmadan, native SQLite :memory: SELECT 1 PASS. Filtre değişimi runtime modülünü bozmadı.
 - Yeni gerçek UI/Goal testi, stres/restart ve yerel kurulum NOT_RUN. Tam güvenilirlik kabulü tamamlanmadı.
 
-Sıradaki adım: son paket içeriği/hash kontrolü, anonimleştirilmiş geçmişin kontrollü güncellenmesi, GitHub PR merge ve beta release doğrulaması. Eski public commit'lerin önceden alınmış kopyaları/cache'leri yerel veya Git ref temizliğiyle geri çağrılamaz.
+## Yayın sonucu
+
+- [PR #1](https://github.com/tamerinal/Chatgpt_goal_conrol/pull/1) merge edildi; kaynak commit `452e709`, merge commit `39f9ae3`. Kullanıcının kişisel bilgi kaldırma talebi kapsamında üç eski commit yeniden yazıldı; remote main yalnız beklenen eski SHA ile eşleşince force-with-lease/atomic güncellendi. Başka uzak çalışma ezilmedi.
+- [v0.1.10-beta.8](https://github.com/tamerinal/Chatgpt_goal_conrol/releases/tag/v0.1.10-beta.8) 6 Kasım 2026 11:15 İstanbul'da public prerelease olarak yayımlandı. EXE ve SHA256SUMS.txt mevcut; GitHub asset SHA256 ve boyutu yerel son paketle eşleşiyor. Release hedefi merge commit'idir.
+- Uzak depodan yeni bare clone alındı: beş erişilebilir commit içinde eski üç özel commit yok; güncel dal ağacı temizlenmiş geçmişe dayanıyor.
+- **Gizlilik kalan işi:** Eski referanssız commit'in GitHub API üzerinden SHA ile hâlâ alınabildiği doğrulandı. Bu nedenle bütün sunucu kopyaları silindi denemez. [GitHub açıklamasına](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository#fully-removing-the-data-from-github) göre sunucu garbage collection/cache temizliği için Support incelemesi gerekir. Destek talebi taslağı eski SHA ayrıntılarıyla yalnız yerel B021 checkpoint'inde hazırlandı; mesaj gönderilmedi. Önceden alınmış clone/fork kopyaları da geri çağrılamaz.
+
+Yayın ve merge tamam. Sıradaki gizlilik adımı: depo sahibinin GitHub Support'a yerel hazır taslakla başvurması; purge sonucu gelmeden tam sunucu silinmesini PASS saymama. Yeni canlı test veya yerel kurulum yapılmadı; geliştirme aşaması ilerletilmedi.
